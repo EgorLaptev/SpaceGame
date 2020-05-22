@@ -1,5 +1,11 @@
 class GameCore {
 
+  // FIXME: наладить f12
+  // TODO: Добавить взрыв к врагам
+  // TODO: Реализовать атаку врагов
+  // TODO: Добавить полосу жизнь игрока
+
+
   // Make new game
   constructor(canv) {
     // Creating canvas
@@ -68,6 +74,13 @@ class GameCore {
       pos: {
         x     : opt.pos.x   || 0,
         y     : opt.pos.y   || 0
+      },
+      die() {
+
+        this.src   = './Images/explosion.png';
+        this.width = this.height = 125;
+        this.speed = 0;
+
       }
     });
   }
@@ -86,40 +99,34 @@ class GameCore {
     // Movement
     document.addEventListener('keydown', (e) => {
 
+      // Toggle game pause
       if (e.keyCode == 27) {
-        if (this.isPause) {
-          this.isPause = false;
-        } else {
-          this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-          this.ctx.fillRect(0, 0, this.cnv.width, this.cnv.height);
-          this.ctx.fillStyle = '#333';
-          this.ctx.font = "64px sans-serif";
-          this.ctx.fillText('Pause', this.cnv.width / 2 - 90, this.cnv.height / 2)
-          this.isPause = true;
-        }
+        if (this.isPause) this.resume();
+        else this.stop();
       }
 
       if (this.isEnd || this.isPause) return 0;
 
+      // Adding pressed keys
       if (e.keyCode == 87 ||
-        e.keyCode == 65 ||
-        e.keyCode == 83 ||
-        e.keyCode == 68) {
-        this._pressedKeys[e.keyCode] = true
-      }
-      if (e.keyCode == 32) {
-        this.attack();
-      }
+          e.keyCode == 65 ||
+          e.keyCode == 83 ||
+          e.keyCode == 68) { this._pressedKeys[e.keyCode] = true }
+
+      // Attack
+      if (e.keyCode == 32) { this.attack() }
+
     });
     document.addEventListener('keyup', (e) => {
+
       if (this.isEnd || this.isPause) return 0;
 
+      // Removing unpressed keys
       if (e.keyCode == 87 ||
-        e.keyCode == 65 ||
-        e.keyCode == 83 ||
-        e.keyCode == 68) {
-        this._pressedKeys[e.keyCode] = false
-      }
+          e.keyCode == 65 ||
+          e.keyCode == 83 ||
+          e.keyCode == 68) { this._pressedKeys[e.keyCode] = false }
+
     });
 
     // Block the context menu
@@ -127,9 +134,16 @@ class GameCore {
       e.preventDefault();
     });
 
-    // Stop the movement when window is blur
-    window.addEventListener('blur', () => {
-      this._pressedKeys = [];
+    // Stop the game when window is blur
+    window.addEventListener('blur', () => this.stop() );
+
+    // Resume the game
+    window.addEventListener('focus', () => this.resume() );
+
+    // Resizing Canvas
+    window.addEventListener('resize', () => {
+      this.cnv.width  = window.innerWidth;
+      this.cnv.height = window.innerHeight;
     });
   }
 
@@ -257,9 +271,6 @@ class GameCore {
     this.draw();
   }
 
-  // Аuxiliary function
-  random(min, max) { return Math.random() * (max - min) + min; }
-
   // Player attack
   attack() {
 
@@ -284,7 +295,7 @@ class GameCore {
     for (let i = 0; i < this._entities.length; i++) {
 
       if (this._entities[i].pos.x < this._bullets[this._bullets.length - 1].pos.x &&
-          this._entities[i].pos.x + this._entities[i].width > this._bullets[this._bullets.length - 1].pos.x) {
+          this._entities[i].pos.x + this._entities[i].width > this._bullets[this._bullets.length - 1].pos.x && this._entities[i].healf > 0) {
 
         // Hit a enemy
         this._entities[i].healf -= this._bullets[this._bullets.length - 1].damage;
@@ -294,14 +305,18 @@ class GameCore {
 
           // Play explosion audio
           let explosion = new Audio();
-          explosion.src = './Sounds/explosion.mp3'
+          explosion.src = './Sounds/explosion.mp3';
           explosion.play();
 
           // Add 1 point if the player has killed an enemy
           this.player.point += this._entities[i].point;
 
-          // Delete a dead enemy
-          this._entities.splice(i, 1);
+          // Explosion effect
+          this._entities[i].die();
+
+          // Remove a dead enemy
+          setTimeout( () => { this._entities.splice(i, 1) }, 250);
+
         };
       }
     }
@@ -346,6 +361,9 @@ class GameCore {
   enimiesGen(interval) {
 
     setInterval(() => {
+
+      if(this.isPause || this.isEnd) return; // Stop enimies genration
+
       Game.addEntity({
         height: 50,
         width: 100,
@@ -357,6 +375,7 @@ class GameCore {
           x: this.random(125, Game.cnv.width - 125),
           y: -50
         }
+
       });
     }, interval);
 
@@ -372,4 +391,27 @@ class GameCore {
 
     setInterval(() => this.loop(), 1000 / 60);
   }
+
+  // Stop the game
+  stop() {
+
+      this.isPause = true; // Stoppage of play
+
+      this._pressedKeys = []; // Drop pressed keys
+
+      // Drawing the pause game menu
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      this.ctx.fillRect(0, 0, this.cnv.width, this.cnv.height);
+      this.ctx.fillStyle = '#333';
+      this.ctx.font = "64px sans-serif";
+      this.ctx.fillText('Pause', this.cnv.width / 2 - 90, this.cnv.height / 2);
+
+  }
+
+  // Resume the game
+  resume() { this.isPause = false }
+
+  // Аuxiliary function
+  random(min, max) { return Math.random() * (max - min) + min; }
+
 }
